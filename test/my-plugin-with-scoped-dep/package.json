@@ -1,5 +1,5 @@
 {
-  "name": "my-plugin-with-dep",
+  "name": "my-plugin-with-scoped-dep",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -9,8 +9,6 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@types/express": "4.17.13",
-    "debug": "^4.3.3",
-    "moment": "2.29.1"
+    "@myscope/my-basic-plugin-scoped": "1.0.0"
   }
 }

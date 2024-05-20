@@ -1,7 +1,11 @@
 "use strict";
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
-    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
 }) : (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     o[k2] = m[k];
@@ -32,10 +36,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.httpDownload = exports.httpJsonGet = exports.headersBasicAuth = exports.headersTokenAuth = exports.headersBearerAuth = void 0;
-const node_fetch_1 = __importDefault(require("node-fetch"));
+const node_fetch_commonjs_1 = __importDefault(require("node-fetch-commonjs"));
 const fs = __importStar(require("./fileSystem"));
 const debug_1 = __importDefault(require("debug"));
+const proxy_agent_1 = require("proxy-agent");
 const debug = (0, debug_1.default)("live-plugin-manager.HttpUtils");
+const agent = new proxy_agent_1.ProxyAgent();
 function headersBearerAuth(token) {
     return {
         Authorization: "Bearer " + token
@@ -60,14 +66,14 @@ function httpJsonGet(sourceUrl, headers) {
             debug(`Json GET ${sourceUrl} ...`);
             debug("HEADERS", headers);
         }
-        const res = yield (0, node_fetch_1.default)(sourceUrl, { headers: Object.assign({}, headers) });
+        const res = yield (0, node_fetch_commonjs_1.default)(sourceUrl, { agent, headers: Object.assign({}, headers) });
         if (debug.enabled) {
             debug("Response HEADERS", res.headers);
         }
         if (!res.ok) {
             throw new Error(`Response error ${res.status} ${res.statusText}`);
         }
-        return res.json();
+        return yield res.json();
     });
 }
 exports.httpJsonGet = httpJsonGet;
@@ -77,7 +83,7 @@ function httpDownload(sourceUrl, destinationFile, headers) {
             debug(`Download GET ${sourceUrl} ...`);
             debug("HEADERS", headers);
         }
-        const res = yield (0, node_fetch_1.default)(sourceUrl, { headers: Object.assign({}, headers) });
+        const res = yield (0, node_fetch_commonjs_1.default)(sourceUrl, { agent, headers: Object.assign({}, headers) });
         if (debug.enabled) {
             debug("Response HEADERS", res.headers);
         }

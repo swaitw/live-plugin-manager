@@ -1,7 +1,11 @@
 "use strict";
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
-    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
 }) : (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     o[k2] = m[k];
@@ -88,7 +92,8 @@ class PluginVm {
             mainFile: filePath,
             name,
             version: "1.0.0",
-            dependencies: {}
+            dependencies: {},
+            dependencyDetails: {}
         };
         try {
             return this.vmRunScriptInPlugin(pluginContext, filePath, code);
@@ -221,6 +226,28 @@ class PluginVm {
             }
             throw new Error(`Cannot find ${requiredName} in plugin ${pluginContext.name}`);
         }
+        if (this.hasDependency(pluginContext, requiredName)) {
+            let fullPath = path.join(pluginContext.location, "node_modules", requiredName);
+            if (!pluginContext.dependencyDetails) {
+                throw new Error(`Dependencies not loaded for plugin ${pluginContext.name}`);
+            }
+            const packageJson = pluginContext.dependencyDetails[requiredName];
+            if (!packageJson) {
+                throw new Error(`${pluginContext.name} does not include ${requiredName} in local dependencies`);
+            }
+            if (packageJson.main) {
+                fullPath = path.join(fullPath, packageJson.main);
+            }
+            const isFile = this.tryResolveAsFile(fullPath);
+            if (isFile) {
+                return isFile;
+            }
+            const isDirectory = this.tryResolveAsDirectory(fullPath);
+            if (isDirectory) {
+                return isDirectory;
+            }
+            throw new Error(`Cannot find ${requiredName} in plugin ${pluginContext.name}`);
+        }
         if (this.isPlugin(requiredName)) {
             return requiredName;
         }
@@ -277,6 +304,13 @@ class PluginVm {
         const { pluginName } = this.splitRequire(requiredName);
         return !!this.manager.getInfo(pluginName);
     }
+    hasDependency(pluginContext, requiredName) {
+        const { dependencyDetails } = pluginContext;
+        if (!dependencyDetails) {
+            return false;
+        }
+        return !!dependencyDetails[requiredName];
+    }
     tryResolveAsFile(fullPath) {
         const parentPath = path.dirname(fullPath);
         if (checkPath(parentPath) !== "directory") {
@@ -284,6 +318,9 @@ class PluginVm {
         }
         const reqPathKind = checkPath(fullPath);
         if (reqPathKind !== "file") {
+            if (checkPath(fullPath + ".cjs") === "file") {
+                return fullPath + ".cjs";
+            }
             if (checkPath(fullPath + ".js") === "file") {
                 return fullPath + ".js";
             }
@@ -300,6 +337,10 @@ class PluginVm {
     tryResolveAsDirectory(fullPath) {
         if (checkPath(fullPath) !== "directory") {
             return undefined;
+        }
+        const indexCjs = path.join(fullPath, "index.cjs");
+        if (checkPath(indexCjs) === "file") {
+            return indexCjs;
         }
         const indexJs = path.join(fullPath, "index.js");
         if (checkPath(indexJs) === "file") {
@@ -347,6 +388,7 @@ class PluginVm {
             // override env to "unlink" from original process
             const srcEnv = sandboxTemplate.env || global.process.env;
             sandbox.process.env = Object.assign({}, srcEnv); // copy properties
+            sandbox.process.on = (event, callback) => { };
         }
         // create global console
         if (!sandbox.console) {

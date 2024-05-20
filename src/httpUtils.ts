@@ -1,7 +1,11 @@
-import fetch from "node-fetch";
+import fetch from "node-fetch-commonjs";
 import * as fs from "./fileSystem";
 import Debug from "debug";
+import { ProxyAgent } from 'proxy-agent';
+
 const debug = Debug("live-plugin-manager.HttpUtils");
+
+const agent = new ProxyAgent();
 
 export interface Headers {
 	[name: string]: string;
@@ -30,7 +34,7 @@ export async function httpJsonGet<T>(sourceUrl: string, headers?: Headers): Prom
 		debug(`Json GET ${sourceUrl} ...`);
 		debug("HEADERS", headers);
 	}
-	const res = await fetch(sourceUrl, { headers: {...headers} });
+	const res = await fetch(sourceUrl, { agent, headers: {...headers} });
 
 	if (debug.enabled) {
 		debug("Response HEADERS", res.headers);
@@ -40,7 +44,7 @@ export async function httpJsonGet<T>(sourceUrl: string, headers?: Headers): Prom
 		throw new Error(`Response error ${res.status} ${res.statusText}`);
 	}
 
-	return res.json();
+	return await res.json() as (T | undefined);
 }
 
 export async function httpDownload(sourceUrl: string, destinationFile: string, headers?: Headers): Promise<void> {
@@ -48,7 +52,7 @@ export async function httpDownload(sourceUrl: string, destinationFile: string, h
 		debug(`Download GET ${sourceUrl} ...`);
 		debug("HEADERS", headers);
 	}
-	const res = await fetch(sourceUrl, { headers: {...headers} });
+	const res = await fetch(sourceUrl, { agent, headers: {...headers} });
 
 	if (debug.enabled) {
 		debug("Response HEADERS", res.headers);
@@ -60,9 +64,9 @@ export async function httpDownload(sourceUrl: string, destinationFile: string, h
 
 	return new Promise<void>((resolve, reject) => {
 		const fileStream = fs.createWriteStream(destinationFile);
-		res.body.pipe(fileStream);
+		res.body!.pipe(fileStream);
 
-		res.body.on("error", (err) => {
+		res.body!.on("error", (err) => {
 			fileStream.close();
 			fs.fileExists(destinationFile)
 				.then(fExist => {
